@@ -1,0 +1,5 @@
+<resources>
+    <declare-styleable name="CaptureButton">
+        <attr name="size" format="float" />
+    </declare-styleable>
+</resources>

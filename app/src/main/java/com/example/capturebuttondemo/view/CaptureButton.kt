@@ -35,8 +35,10 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
 
     private var buttonSize: Float          //控件大小
     private var strokeWidth: Float         //进度条宽度
-    private var outsideRadius: Float       //外圆半径
-    private var insideRadius: Float        //内圆半径
+    private var outsideRadius: Float       //外圆当前半径
+    private var insideRadius: Float        //内圆当前半径
+    private var insideIdleRadius: Float    //内圆空闲状态时半径
+    private var outsideIdleRadius: Float   //外圆空闲状态时半径
     private var outsideAddRadius: Float    //长按动画师外圆增加的半径
     private var insideReduceRadius: Float  //长按动画时内圆减少的半径
 
@@ -52,17 +54,21 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
 
     private val recordTimer: RecordCountDownTimer
 
+    private var preRecordAnimSet: AnimatorSet? = null
+
     init {
         state = STATE_IDLE
         //初始化按钮尺寸
         val ta = context.obtainStyledAttributes(attrs, R.styleable.CaptureButton)
         buttonSize = ta.getFloat(R.styleable.CaptureButton_size, 0F)
         ta.recycle()
-        //内外圆半径，内外圆动画过程中变化的半径，进度条宽度
-        outsideRadius = buttonSize / 2
-        insideRadius = buttonSize / 2 * 0.75F
+        //内外圆空闲时半径，内外圆动画过程中变化的半径，内外圆当前半径，进度条宽度
+        outsideIdleRadius = buttonSize / 2
+        insideIdleRadius = buttonSize / 2 * 0.75F
         outsideAddRadius = buttonSize / 5
         insideReduceRadius = buttonSize / 8
+        outsideRadius = outsideIdleRadius
+        insideRadius = insideIdleRadius
         strokeWidth = buttonSize / 15
         //控件中心坐标
         centerX = (buttonSize + outsideAddRadius * 2) / 2
@@ -134,7 +140,7 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
     // 长按任务
     private val longPressedRunnable = Runnable {
         state = STATE_LONG_PRESSED
-        preRecordAnimation(
+        startAnimation(
             outsideRadius,
             outsideRadius + outsideAddRadius,
             insideRadius,
@@ -149,12 +155,19 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
                 captureAnimation()
             }
             STATE_LONG_PRESSED -> {
-
+                preRecordAnimSet?.cancel()
+                startAnimation(
+                    outsideRadius,
+                    outsideIdleRadius,
+                    insideRadius,
+                    insideIdleRadius
+                )
             }
             STATE_RECORDING -> {
-
+                postRecord()
             }
         }
+        state = STATE_IDLE
     }
 
     /**
@@ -164,12 +177,12 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
         val insideAnim = ValueAnimator.ofFloat(
             insideRadius,
             insideRadius - insideReduceRadius,
-            buttonSize / 2 * 0.75F
+            insideIdleRadius
         )
         val outsideAnim = ValueAnimator.ofFloat(
             outsideRadius,
             outsideRadius + outsideAddRadius,
-            buttonSize / 2
+            outsideIdleRadius
         )
         //外圆增大动画
         outsideAnim.addUpdateListener {
@@ -191,18 +204,19 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
                 }
             }
         )
+        animSet.duration = ANIMATION_DURATION
+        animSet.start()
     }
 
     /**
-     * 长按动画，动画过程中按钮外圆逐渐增大，内圆逐渐减小。
-     * 动画结束后开始录制视频。
+     * 预录制时和结束录制时被调用的动画函数。
      *
      * @param outsideStart 外圆起始半径
      * @param outsideEnd   外圆结束半径
      * @param insideStart  内圆起始半径
      * @param insideEnd    内圆结束半径
      */
-    private fun preRecordAnimation(
+    private fun startAnimation(
         outsideStart: Float,
         outsideEnd: Float,
         insideStart: Float,
@@ -229,23 +243,40 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
                     if (state == STATE_LONG_PRESSED) {
                         state = STATE_RECORDING
                         // TODO: 开始录像。
+                    } else if (state == STATE_RECORDING) {
+                        state = STATE_IDLE
                     }
                 }
             }
         )
+        preRecordAnimSet = animSet
         animSet.duration = ANIMATION_DURATION
         animSet.start()
     }
 
-    fun updateProgress(millisUntilFinished: Long) {
+    /**
+     * 录制中动画，随进度条不断增长的圆弧。
+     */
+    private fun updateProgress(millisUntilFinished: Long) {
         progress = 360F - millisUntilFinished / MAX_RECORD_DURATION.toFloat() * 360
         invalidate()
+    }
+
+    private fun postRecord() {
+        progress = 0F
+        startAnimation(
+            outsideRadius,
+            outsideIdleRadius,
+            insideRadius,
+            insideIdleRadius
+        )
     }
 
     inner class RecordCountDownTimer(millisInFuture: Long, countDownInterval: Long) :
         CountDownTimer(millisInFuture, countDownInterval) {
         override fun onFinish() {
             updateProgress(0)
+            postRecord()
         }
 
         override fun onTick(millisUntilFinished: Long) {

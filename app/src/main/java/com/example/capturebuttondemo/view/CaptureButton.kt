@@ -161,7 +161,36 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
      * 拍照动画。
      */
     private fun captureAnimation() {
-
+        val insideAnim = ValueAnimator.ofFloat(
+            insideRadius,
+            insideRadius - insideReduceRadius,
+            buttonSize / 2 * 0.75F
+        )
+        val outsideAnim = ValueAnimator.ofFloat(
+            outsideRadius,
+            outsideRadius + outsideAddRadius,
+            buttonSize / 2
+        )
+        //外圆增大动画
+        outsideAnim.addUpdateListener {
+            outsideRadius = it.animatedValue as Float
+            invalidate()
+        }
+        //内圆增大动画
+        insideAnim.addUpdateListener {
+            insideRadius = it.animatedValue as Float
+            invalidate()
+        }
+        val animSet = AnimatorSet()
+        animSet.playTogether(outsideAnim, insideAnim)
+        animSet.addListener(
+            object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator?) {
+                    super.onAnimationEnd(animation)
+                    state = STATE_IDLE
+                }
+            }
+        )
     }
 
     /**

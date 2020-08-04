@@ -25,8 +25,9 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
         private const val STATE_LONG_PRESSED = 2
         private const val STATE_RECORDING = 3
 
-        private const val ANIMATION_DURATION = 100L     //长按短按动画时长
-        private const val MAX_RECORD_DURATION = 10000L  //录制最大时长
+        private const val SHORT_ANIMATION_DURATION = 100L  //动画最短时长
+        private const val LONG_ANIMATION_DURATION = 200L   //动画最大时长
+        private const val MAX_RECORD_DURATION = 10000L     //录制最大时长
     }
 
     private var state: Int
@@ -45,9 +46,9 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
     private var centerX: Float
     private var centerY: Float
 
-    private var progressBarColor: Int = 0xEE16AE16.toInt()  //进度条颜色
-    private var outsideColor: Int = 0XEECCCCCC.toInt()      //外圆颜色
-    private var insideColor: Int = 0XFFFFFFFF.toInt()       //内圆颜色
+    private var progressBarColor: Int = resources.getColor(R.color.colorPrimaryDark)  //进度条颜色
+    private var outsideColor: Int = resources.getColor(R.color.colorPrimary)      //外圆颜色
+    private var insideColor: Int = resources.getColor(R.color.colorAccent)      //内圆颜色
 
     private var progress: Float = 0F  //录制进度
     private var rectF: RectF
@@ -60,7 +61,7 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
         state = STATE_IDLE
         //初始化按钮尺寸
         val ta = context.obtainStyledAttributes(attrs, R.styleable.CaptureButton)
-        buttonSize = ta.getFloat(R.styleable.CaptureButton_size, 0F)
+        buttonSize = ta.getFloat(R.styleable.CaptureButton_size, 10F)
         ta.recycle()
         //内外圆空闲时半径，内外圆动画过程中变化的半径，内外圆当前半径，进度条宽度
         outsideIdleRadius = buttonSize / 2
@@ -74,11 +75,18 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
         centerX = (buttonSize + outsideAddRadius * 2) / 2
         centerY = (buttonSize + outsideAddRadius * 2) / 2
         //进度条范围
+//        rectF = RectF(
+//            centerX - (buttonSize / 2 + outsideAddRadius - strokeWidth / 2),
+//            centerY + (buttonSize / 2 + outsideAddRadius - strokeWidth / 2),
+//            centerX + (buttonSize / 2 + outsideAddRadius - strokeWidth / 2),
+//            centerY - (buttonSize / 2 + outsideAddRadius - strokeWidth / 2)
+//        )
+
         rectF = RectF(
             centerX - (buttonSize / 2 + outsideAddRadius - strokeWidth / 2),
-            centerY + (buttonSize / 2 + outsideAddRadius - strokeWidth / 2),
+            centerY - (buttonSize / 2 + outsideAddRadius - strokeWidth / 2),
             centerX + (buttonSize / 2 + outsideAddRadius - strokeWidth / 2),
-            centerY - (buttonSize / 2 + outsideAddRadius - strokeWidth / 2)
+            centerY + (buttonSize / 2 + outsideAddRadius - strokeWidth / 2)
         )
 
         recordTimer = RecordCountDownTimer(
@@ -89,6 +97,17 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
         mPaint.isAntiAlias = true
     }
 
+    // 长按任务
+    private val longPressedRunnable = Runnable {
+        state = STATE_LONG_PRESSED
+        startAnimation(
+            outsideRadius,
+            outsideRadius + outsideAddRadius,
+            insideRadius,
+            insideRadius - insideReduceRadius
+        )
+    }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         setMeasuredDimension(
@@ -97,21 +116,21 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
         )
     }
 
-    override fun onDraw(canvas: Canvas) {
+    override fun onDraw(canvas: Canvas?) {
         super.onDraw(canvas)
         //画外圆
         mPaint.style = Paint.Style.FILL
         mPaint.color = outsideColor
-        canvas.drawCircle(centerX, centerY, outsideRadius, mPaint)
+        canvas?.drawCircle(centerX, centerY, outsideRadius, mPaint)
         //画内圆
         mPaint.color = insideColor
-        canvas.drawCircle(centerX, centerY, insideRadius, mPaint)
-        //如果按钮处于正在录制视频的状态)，则绘制进度条。
+        canvas?.drawCircle(centerX, centerY, insideRadius, mPaint)
+        //如果按钮处于正在录制视频的状态，则绘制进度条。
         if (state == STATE_RECORDING) {
             mPaint.color = progressBarColor
             mPaint.style = Paint.Style.STROKE
             mPaint.strokeWidth = strokeWidth
-            canvas.drawArc(rectF, -90F, progress, false, mPaint)
+            canvas?.drawArc(rectF, -90F, progress, false, mPaint)
         }
     }
 
@@ -137,17 +156,6 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
         return true
     }
 
-    // 长按任务
-    private val longPressedRunnable = Runnable {
-        state = STATE_LONG_PRESSED
-        startAnimation(
-            outsideRadius,
-            outsideRadius + outsideAddRadius,
-            insideRadius,
-            insideRadius - insideReduceRadius
-        )
-    }
-
     private fun handleUnpressedByState() {
         removeCallbacks(longPressedRunnable)
         when (state) {
@@ -156,6 +164,7 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
             }
             STATE_LONG_PRESSED -> {
                 preRecordAnimSet?.cancel()
+                preRecordAnimSet = null
                 startAnimation(
                     outsideRadius,
                     outsideIdleRadius,
@@ -164,6 +173,7 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
                 )
             }
             STATE_RECORDING -> {
+                recordTimer.cancel()
                 postRecord()
             }
         }
@@ -204,7 +214,7 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
                 }
             }
         )
-        animSet.duration = ANIMATION_DURATION
+        animSet.duration = LONG_ANIMATION_DURATION
         animSet.start()
     }
 
@@ -243,6 +253,7 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
                     if (state == STATE_LONG_PRESSED) {
                         state = STATE_RECORDING
                         // TODO: 开始录像。
+                        recordTimer.start()
                     } else if (state == STATE_RECORDING) {
                         state = STATE_IDLE
                     }
@@ -250,7 +261,7 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
             }
         )
         preRecordAnimSet = animSet
-        animSet.duration = ANIMATION_DURATION
+        animSet.duration = SHORT_ANIMATION_DURATION
         animSet.start()
     }
 

@@ -6,6 +6,7 @@ import android.animation.AnimatorSet
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.CountDownTimer
@@ -46,9 +47,9 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
     private var centerX: Float
     private var centerY: Float
 
-    private var progressBarColor: Int = resources.getColor(R.color.colorPrimaryDark)  //进度条颜色
-    private var outsideColor: Int = resources.getColor(R.color.colorPrimary)      //外圆颜色
-    private var insideColor: Int = resources.getColor(R.color.colorAccent)      //内圆颜色
+    private var progressBarColor: Int = Color.MAGENTA  //进度条颜色
+    private var outsideColor: Int = Color.GRAY    //外圆颜色
+    private var insideColor: Int = Color.WHITE    //内圆颜色
 
     private var progress: Float = 0F  //录制进度
     private var rectF: RectF
@@ -75,13 +76,6 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
         centerX = (buttonSize + outsideAddRadius * 2) / 2
         centerY = (buttonSize + outsideAddRadius * 2) / 2
         //进度条范围
-//        rectF = RectF(
-//            centerX - (buttonSize / 2 + outsideAddRadius - strokeWidth / 2),
-//            centerY + (buttonSize / 2 + outsideAddRadius - strokeWidth / 2),
-//            centerX + (buttonSize / 2 + outsideAddRadius - strokeWidth / 2),
-//            centerY - (buttonSize / 2 + outsideAddRadius - strokeWidth / 2)
-//        )
-
         rectF = RectF(
             centerX - (buttonSize / 2 + outsideAddRadius - strokeWidth / 2),
             centerY - (buttonSize / 2 + outsideAddRadius - strokeWidth / 2),
@@ -137,7 +131,6 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                //暂时把长按阈值写死, 后续改为可配置
                 state = STATE_PRESSED
                 postDelayed(longPressedRunnable, 500)
             }
@@ -185,13 +178,13 @@ class CaptureButton(context: Context, attrs: AttributeSet) : View(context) {
      */
     private fun captureAnimation() {
         val insideAnim = ValueAnimator.ofFloat(
-            insideRadius,
-            insideRadius - insideReduceRadius,
+            insideIdleRadius,
+            insideIdleRadius - insideReduceRadius,
             insideIdleRadius
         )
         val outsideAnim = ValueAnimator.ofFloat(
-            outsideRadius,
-            outsideRadius + outsideAddRadius,
+            outsideIdleRadius,
+            outsideIdleRadius + outsideAddRadius,
             outsideIdleRadius
         )
         //外圆增大动画
